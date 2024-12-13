@@ -1,0 +1,86 @@
+import subprocess
+import time
+import os
+import pandas as pd
+from joblib import load
+from datetime import datetime
+
+# ========================== 1. Tải mô hình học máy ==========================
+# Tải mô hình dự đoán từ đường dẫn đã lưu
+model = load('C:\\Users\\KIEN\\Desktop\\wireshark\\model.pkl')
+
+# ========================== 2. Thiết lập môi trường và cấu hình ==========================
+# Chuyển đến thư mục cài đặt Wireshark
+os.chdir("C:\\Program Files\\Wireshark")
+
+# Lệnh tshark để thu thập dữ liệu mạng
+command_tshark = r"tshark -i \Device\NPF_{08DB9678-8129-4C96-B2AA-216B0F27FAF4} -w E:\dataset\model\nnn.pcap -F pcap"
+
+# Chuyển đến thư mục cài đặt CICFlowMeter
+os.chdir("C:\\Users\\KIEN\\Downloads\\cicflowmeter-4\\CICFlowMeter-4.0\\bin")
+
+# Lệnh để chạy CICFlowMeter
+command_cfm = "cfm.bat E:\\dataset\\model\\nnn.pcap E:\\dataset\\model"
+
+# Từ điển lưu thời gian phát hiện đầu tiên
+first_detection_time = {}
+
+# ========================== 3. Khởi động thu thập dữ liệu mạng với Wireshark ==========================
+# Khởi chạy tshark trong một tiến trình độc lập
+process_tshark = subprocess.Popen(command_tshark, shell=True)
+
+# ========================== 4. Vòng lặp giám sát và xử lý dữ liệu ==========================
+try:
+    while True:
+        # ========================== 5. Phân tích dữ liệu mạng bằng CICFlowMeter ==========================
+        # Chạy CICFlowMeter để phân tích dữ liệu
+        subprocess.run(command_cfm, shell=True)
+
+        # ========================== 6. Xử lý và chuẩn bị dữ liệu đầu vào cho mô hình ==========================
+        # Kiểm tra xem file kết quả đã được tạo chưa
+        output_file = 'E:\\dataset\\model\\nnn.pcap_Flow.csv'
+        if os.path.exists(output_file):
+            # Đọc dữ liệu từ file CSV kết quả
+            data = pd.read_csv(output_file)
+            network_info = data[['Src IP', 'Dst IP']]
+
+            # Chọn các cột cần thiết và loại bỏ nhãn 'Label'
+            features = [
+                'Src Port', 'Dst Port', 'Flow Duration', 'TotLen Fwd Pkts', 'Fwd Pkt Len Max', 
+                'Flow Byts/s', 'Flow Pkts/s', 'Flow IAT Mean', 'Flow IAT Max', 'Bwd Pkt Len Mean', 
+                'FIN Flag Cnt', 'SYN Flag Cnt', 'PSH Flag Cnt', 'ACK Flag Cnt', 'Down/Up Ratio', 
+                'Subflow Fwd Byts', 'Subflow Fwd Pkts', 'Label'
+            ]
+            data = data[features].drop('Label', axis=1)
+
+            # ========================== 7. Dự đoán tấn công mạng ==========================
+            # Dự đoán lớp tấn công
+            predictions = model.predict(data)
+            print("\n============================ DỰ ĐOÁN ============================")
+
+            # Phân loại kết quả dự đoán
+            unique_predictions = set(predictions)
+            attack_labels = unique_predictions - {"Normal"}  # Loại nhãn "Normal"
+
+            # ========================== 8. Cảnh báo và ghi nhận tấn công ==========================
+            # Hiển thị kết quả
+            if attack_labels:
+                for attack in attack_labels:
+                    if attack not in first_detection_time:
+                        # Lưu thời gian phát hiện đầu tiên nếu chưa tồn tại
+                        first_detection_time[attack] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                # Hiển thị thông báo cảnh báo
+                print("⚠️⚠️⚠️  [CẢNH BÁO] - Phát hiện tấn công: ⚠️⚠️⚠️")
+                for attack, detection_time in first_detection_time.items():
+                    print(f"🔎  Nhãn: {attack} - Thời gian phát hiện: {detection_time}")
+            else:
+                print(f"✅  [AN TOÀN] - Không phát hiện tấn công (Normal) lúc {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}✅")
+
+            print("==================================================================")
+
+        # Dừng 10 giây trước khi tiếp tục
+        time.sleep(10)
+except KeyboardInterrupt:
+    # ========================== 9. Xử lý dừng chương trình ==========================
+    print("Chương trình đã bị dừng bởi người dùng.")
