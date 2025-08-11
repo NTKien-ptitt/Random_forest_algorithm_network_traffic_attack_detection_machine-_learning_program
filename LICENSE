@@ -1,1 +1,16 @@
 
+
+# 04.PRIVILEGE-ESCALATION
+
+# 1. LINUX -> **GTFOBins**
+# 2.windows -> **LOLBAS**
+
+smbclient -L 172.16.1.21 
+
+https://gist.github.com/yezz123/52d2fc45c5de284ec89131c2a3dde389?utm_source=chatgpt.com#Port-139/445---SMB
+
+https://musyokaian.medium.com/policy-panic-parrot-ctf-write-up-fd283fe636ed
+
+https://medium.com/%40alt123/relevant-ctf-tryhackme-walkthrough-d0f55cbe6408 ********
+
+https://ctftime.org/writeup/29626?utm_source=chatgpt.com
